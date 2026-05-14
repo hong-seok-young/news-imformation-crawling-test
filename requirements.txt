@@ -1,0 +1,15 @@
+# DART 크롤러 & 리포트 생성기
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+urllib3>=2.0.0
+lxml>=4.9.0
+
+# AI (사용하는 것만 설치)
+openai>=1.30.0
+anthropic>=0.25.0
+
+# 이메일 (내장 smtplib 사용, 별도 설치 불필요)
+# smtplib - built-in
+
+# 기타
+python-dotenv>=1.0.0    # 로컬 개발용 .env 지원

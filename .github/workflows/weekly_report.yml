@@ -1,0 +1,78 @@
+name: 주간 수주정보 리포트
+
+on:
+  # ── 스케줄 (매주 수요일 오전 9시 KST = UTC 00:00) ──────────
+  schedule:
+    - cron: "0 0 * * 3"          # 수요일 09:00 KST
+
+  # ── 수동 실행 허용 ───────────────────────────────────────────
+  workflow_dispatch:
+    inputs:
+      days_back:
+        description: '조회 기간 (일)'
+        required: false
+        default: '7'
+      send_email:
+        description: '이메일 발송 여부 (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. 코드 체크아웃 ──────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Python 세팅 ────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 3. 패키지 설치 ────────────────────────────────────────
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── 4. output 폴더 생성 ───────────────────────────────────
+      - name: Create output directory
+        run: mkdir -p output
+
+      # ── 5. 리포트 생성 실행 ───────────────────────────────────
+      - name: Run report pipeline
+        env:
+          DART_API_KEY:   ${{ secrets.DART_API_KEY }}
+          AI_API_KEY:     ${{ secrets.AI_API_KEY }}
+          AI_PROVIDER:    ${{ secrets.AI_PROVIDER }}     # openai or claude
+          AI_MODEL:       ${{ secrets.AI_MODEL }}        # 선택사항
+          SMTP_HOST:      ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:      ${{ secrets.SMTP_PORT }}
+          SMTP_USER:      ${{ secrets.SMTP_USER }}
+          SMTP_PASS:      ${{ secrets.SMTP_PASS }}
+          EMAIL_TO:       ${{ secrets.EMAIL_TO }}
+          OUTPUT_DIR:     output
+          TEMPLATE_PATH:  template/report_r5_팀색상_맨위로.html
+          DAYS_BACK:      ${{ github.event.inputs.days_back || '7' }}
+          SEND_EMAIL:     ${{ github.event.inputs.send_email || 'false' }}
+        run: python main.py
+
+      # ── 6. 생성된 HTML을 Artifacts로 저장 ────────────────────
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-report-${{ github.run_number }}
+          path: output/*.html
+          retention-days: 30
+
+      # ── 7. (선택) output 폴더를 gh-pages 브랜치로 푸시 ───────
+      - name: Deploy to gh-pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir:  ./output
+          keep_files:   true          # 이전 리포트 유지
